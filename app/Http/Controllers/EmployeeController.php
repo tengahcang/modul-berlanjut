@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class EmployeeController extends Controller
@@ -14,7 +15,15 @@ class EmployeeController extends Controller
     {
         //
         $pageTitle = 'Employee List';
-        return view('employee.index', ['pageTitle' => $pageTitle]);
+        // $employees = DB::select(' select *, employees.id as employee_id, positions.name as position_name from employees left join positions on employees.position_id = positions.id ');
+        $pegawai = DB::table('employees')
+            ->select('*', 'employees.id as employee_id', 'positions.name as position_name')
+            ->leftJoin('positions', 'employees.position_id', '=', 'positions.id')
+            ->get();
+        return view('employee.index', [
+            'pageTitle' => $pageTitle,
+            'employees' => $pegawai
+        ]);
     }
 
     /**
@@ -24,7 +33,11 @@ class EmployeeController extends Controller
     {
         //
         $pageTitle = 'Create Employee';
-        return view('employee.create', compact('pageTitle'));
+        // $positions = DB::select('select * from positions');
+        $positions = DB::table('positions')
+            ->select('*')
+            ->get();
+        return view('employee.create', compact('pageTitle', 'positions'));
     }
 
     /**
@@ -33,6 +46,7 @@ class EmployeeController extends Controller
     public function store(Request $request)
     {
         //
+        // dd($request);
         $messages = [
             'required' => ':Attribute harus diisi.',
             'email' => 'Isi :attribute dengan format yang benar',
@@ -47,7 +61,16 @@ class EmployeeController extends Controller
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
-        return $request->all();
+
+        DB::table('employees')->insert([
+            'firstname' => $request->firstName,
+            'lastname' => $request->lastName,
+            'email' => $request->email,
+            'age' => $request->age,
+            'position_id' => $request->position,
+        ]);
+
+        return redirect()->route('employees.index');
     }
 
     /**
@@ -56,6 +79,16 @@ class EmployeeController extends Controller
     public function show(string $id)
     {
         //
+        // dd($id);
+        $pageTitle = 'Employee Detail';
+        // RAW SQL QUERY
+        // $employee = collect(DB::select(' select *, employees.id as employee_id, positions.name as position_name from employees left join positions on employees.position_id = positions.id where employees.id = ? ', [$id]))->first();
+        $employee = DB::table('employees')
+            ->select('*', 'employees.id as employee_id', 'positions.name as position_name')
+            ->leftJoin('positions', 'employees.position_id', '=', 'positions.id')
+            ->where('employees.id', '=', $id)
+            ->first();
+        return view('employee.show', compact('pageTitle', 'employee'));
     }
 
     /**
@@ -64,6 +97,16 @@ class EmployeeController extends Controller
     public function edit(string $id)
     {
         //
+        $pageTitle = 'Employee Edit';
+        $employee = DB::table('employees')
+            ->select('*', 'employees.id as employee_id', 'positions.name as position_name')
+            ->leftJoin('positions', 'employees.position_id', '=', 'positions.id')
+            ->where('employees.id', '=', $id)
+            ->first();
+        $positions = DB::table('positions')
+            ->select('*')
+            ->get();
+        return view('employee.edit', compact('pageTitle', 'employee', 'positions'));
     }
 
     /**
@@ -72,6 +115,30 @@ class EmployeeController extends Controller
     public function update(Request $request, string $id)
     {
         //
+        $messages = [
+            'required' => 'Attribute harus diisi',
+            'email' => 'Isi :attribute dengan format yang benar',
+            'numeric' => 'Isi :attribute dengan angka'
+        ];
+        $validator = Validator::make($request->all(), [
+            'firstName' => 'required',
+            'lastName' => 'required',
+            'email' => 'required|email',
+            'age' => 'required|numeric'
+        ], $messages);
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+        DB::table('employees')
+            ->where('id', $id)
+            ->update([
+                'firstname' => $request->input('firstName'),
+                'lastname' => $request->input('lastName'),
+                'email' => $request->input('email'),
+                'age' => $request->input('age'),
+                'position_id' => $request->input('position')
+            ]);
+        return redirect()->route('employees.index');
     }
 
     /**
@@ -80,5 +147,9 @@ class EmployeeController extends Controller
     public function destroy(string $id)
     {
         //
+        DB::table('employees')
+            ->where('id', $id)
+            ->delete();
+        return redirect()->route('employees.index');
     }
 }
